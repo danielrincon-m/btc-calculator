@@ -38,7 +38,12 @@ section{background:var(--card);border:1px solid var(--line);border-radius:14px;p
 #verdictSub{font-size:16px;color:var(--muted);margin:0}
 .hero{background:transparent;border:none;padding:4px 0 0;margin-top:0}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--chip);color:var(--ink);margin-bottom:12px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.pills .pill{margin-bottom:0}
+.pill.src{font-weight:500}
+.pill.src.ok{background:color-mix(in srgb,var(--in) 14%,var(--chip))}
+.pill.src.fail{background:color-mix(in srgb,var(--sell) 14%,var(--chip))}
+.dot.pulse{animation:pulse 1s ease-in-out infinite alternate}@keyframes pulse{to{opacity:.3}}@media (prefers-reduced-motion:reduce){.dot.pulse{animation:none}}
 /* lane */
 .lane{position:relative;height:96px;margin:26px 0 8px}
 .track{position:absolute;left:0;right:0;top:44px;height:10px;border-radius:5px;background:var(--chip);overflow:hidden}
@@ -99,7 +104,8 @@ details p{color:var(--muted);font-size:15px;max-width:68ch}
 <h1>Bitcoin · regla de la media de 200 días con bandas del 5%</h1>
 
 <section class="hero" aria-live="polite">
-  <div class="pill"><span class="dot" id="stateDot"></span><span id="stateText">—</span></div>
+  <div class="pills"><div class="pill"><span class="dot" id="stateDot"></span><span id="stateText">—</span></div>
+  <div class="pill src" id="srcBadge" role="status"><span class="dot" id="srcDot"></span><span id="srcText">Buscando precios…</span></div></div>
   <p id="verdict">Cargando…</p>
   <p id="verdictSub"></p>
   <div class="lane" id="lane" aria-hidden="true"></div>
@@ -404,8 +410,10 @@ function cleanSeries(rows){
   let i=arr.length-1; while(i>0 && dayDiff(arr[i-1][0],arr[i][0])===1) i--;
   return arr.slice(i);
 }
+function setSrc(kind,text){ const b=$("srcBadge"), d=$("srcDot"); b.className="pill src"+(kind==="ok"?" ok":kind==="fail"?" fail":"");
+  d.className="dot"+(kind==="load"?" pulse":""); d.style.background= kind==="ok"?"var(--in)":kind==="fail"?"var(--sell)":"var(--muted)"; $("srcText").textContent=text; }
 async function refreshPrices(){
-  const note=$("srcNote"); note.textContent="Buscando los últimos cierres…";
+  const note=$("srcNote"); note.textContent="Buscando los últimos cierres…"; setSrc("load","Buscando precios…");
   for(const [name,fn] of [["Kraken",fromKraken],["Coinbase",fromCoinbase]]){
     try{ const ser=cleanSeries(await fn());
       if(ser.length<260) continue;
@@ -413,9 +421,11 @@ async function refreshPrices(){
       HIST=ser; state.added=state.added.filter(a=>a[0]>HIST[HIST.length-1][0]);
       persist(); $("cDate").dataset.auto="1"; $("cDate").value=""; render();
       note.innerHTML=`<span class="ok">Cierres actualizados automáticamente desde ${name} hasta el ${fmtDate(HIST[HIST.length-1][0])}.</span>`;
+      setSrc("ok",`En vivo desde ${name} · consultado ${new Date().toLocaleTimeString("es-CO",{hour:"numeric",minute:"2-digit"})}`);
       return;
     }catch(e){}
   }
+  setSrc("fail",`Sin conexión a Kraken ni Coinbase · datos hasta el ${fmtDate(series()[series().length-1][0])}`);
   note.innerHTML=`<span class="err">No se pudieron descargar los precios (sin conexión o la fuente bloqueó el acceso). Puedes agregar los cierres a mano.</span>`;
 }
 refreshPrices();
