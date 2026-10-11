@@ -84,8 +84,23 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .closes td{padding:6px 2px;border-bottom:1px solid var(--line)}
 .closes td:last-child{text-align:right}
 .tag{font-size:11px;color:var(--muted);margin-left:6px}
-.chartwrap{overflow-x:auto;margin-top:6px}
-svg text{fill:var(--muted);font-size:11px;font-family:inherit}
+.chartwrap{position:relative;margin-top:6px;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.chartwrap svg{display:block;width:100%;height:auto}
+.ctools{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin:4px 0 10px}
+.ranges{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.ranges button{border:none;border-radius:0;background:transparent;color:var(--ink);font-weight:500;padding:6px 11px;font-size:14px}
+.ranges button[aria-pressed="true"]{background:var(--ink);color:var(--card)}
+.legend{display:flex;flex-wrap:wrap;gap:6px}
+.legend button{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;padding:4px 9px;border-radius:999px;background:var(--chip);color:var(--ink);border:1px solid transparent}
+.legend button[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+.legend i{width:14px;height:0;border-top:2.5px solid currentColor;display:inline-block}
+.legend i.dash{border-top-style:dashed}
+.tip{position:absolute;top:0;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;line-height:1.45;box-shadow:0 6px 18px rgba(20,33,61,.14);min-width:168px;display:none;z-index:2}
+.tip b{display:block;font-size:13px;margin-bottom:2px}
+.tip .r{display:flex;justify-content:space-between;gap:12px}
+.tip .r span:first-child{color:var(--muted)}
+.tip .sig{margin-top:4px;font-weight:600}
+svg text{fill:var(--muted);font-size:12px;font-family:inherit}
 .out{margin-top:16px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
 .out div{background:var(--chip);border-radius:10px;padding:10px 12px}
 .out span{display:block;font-size:13px;color:var(--muted)}
@@ -160,9 +175,19 @@ details p{color:var(--muted);font-size:15px;max-width:68ch}
 </section>
 
 <section>
-  <h2>Últimos 200 días</h2>
-  <p class="sub">Precio, media de 200 días y las dos bandas.</p>
-  <div class="chartwrap"><svg id="chart" viewBox="0 0 720 260" width="100%" role="img" aria-label="Gráfico del precio con la media de 200 días y las bandas"></svg></div>
+  <h2>Gráfico</h2>
+  <p class="sub">Pasa el cursor o toca el gráfico para ver los valores de cada día. Los triángulos marcan las señales de compra y venta de la regla.</p>
+  <div class="ctools">
+    <div class="ranges" role="group" aria-label="Periodo">
+      <button data-r="90">3M</button><button data-r="180">6M</button><button data-r="365" aria-pressed="true">1A</button><button data-r="all">Todo</button>
+    </div>
+    <div class="legend" role="group" aria-label="Series">
+      <button data-s="price" aria-pressed="true" style="color:var(--price)"><i></i><span style="color:var(--ink)">Precio</span></button>
+      <button data-s="sma" aria-pressed="true" style="color:var(--sma)"><i></i><span style="color:var(--ink)">Media 200</span></button>
+      <button data-s="bands" aria-pressed="true" style="color:var(--buy)"><i class="dash"></i><span style="color:var(--ink)">Bandas</span></button>
+    </div>
+  </div>
+  <div class="chartwrap" id="chartwrap"><svg id="chart" viewBox="0 0 720 300" role="img" aria-label="Gráfico del precio con la media de 200 días y las bandas"></svg><div class="tip" id="tip"></div></div>
 </section>
 
 <section>
@@ -298,25 +323,71 @@ function drawLane(r){
    <div class="marker" style="left:${Math.min(96,Math.max(4,X(r.C)))}%"><div class="val num">${fmt(r.C)}</div><div class="stem"></div><div class="knob"></div></div>`;
 }
 
+let chartRange=365, show={price:true,sma:true,bands:true}, lastR=null, chartGeo=null;
 function drawChart(r){
-  const closes = r.closes, n=closes.length, N=200, start=n-N;
-  const P=[],M=[]; for(let i=start;i<n;i++){ P.push(closes[i]); M.push(sma(closes,i)); }
-  const all = P.concat(M.map(x=>x*1.05), M.map(x=>x*0.95));
-  const lo=Math.min(...all)*0.97, hi=Math.max(...all)*1.02, W=720,H=260,pl=48,pr=8,pt=10,pb=24;
+  lastR=r;
+  const closes=r.closes, ser=r.ser, n=closes.length;
+  // signals over full series
+  const sig=new Map(); let st="out";
+  for(let i=199;i<n;i++){ const m=sma(closes,i);
+    if(st==="out"&&closes[i]>m*1.05){st="in";sig.set(i,"buy");} else if(st==="in"&&closes[i]<m*0.95){st="out";sig.set(i,"sell");} }
+  const avail=n-199, N=Math.max(30,Math.min(chartRange==="all"?avail:chartRange,avail)), start=n-N;
+  const P=[],M=[],D=[]; for(let i=start;i<n;i++){ P.push(closes[i]); M.push(sma(closes,i)); D.push(ser[i]?ser[i][0]:r.lastDate); }
+  const vals=[]; if(show.price) vals.push(...P); if(show.sma) vals.push(...M); if(show.bands) vals.push(...M.map(x=>x*1.05),...M.map(x=>x*0.95)); if(!vals.length) vals.push(...P);
+  const W=Math.max(300,Math.round($("chartwrap").clientWidth||720)), H=W<520?250:300; $("chart").setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const lo=Math.min(...vals)*0.97, hi=Math.max(...vals)*1.02, pl=W<520?40:50,pr=8,pt=12,pb=28;
   const x=i=>pl+i*(W-pl-pr)/(N-1), y=v=>pt+(hi-v)/(hi-lo)*(H-pt-pb);
   const path=(arr,k=1)=>arr.map((v,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(v*k).toFixed(1)).join("");
-  let g=""; const steps=4;
-  for(let s=0;s<=steps;s++){ const v=lo+(hi-lo)*s/steps;
-    g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${y(v)+4}" text-anchor="end">${Math.round(v/1000)}k</text>`; }
-  const ser=r.ser.slice(-N);
-  [0,Math.floor(N/2),N-1].forEach(i=>{ g+=`<text x="${x(i)}" y="${H-6}" text-anchor="${i===0?'start':i===N-1?'end':'middle'}">${fmtDate(ser[i][0])}</text>`; });
-  $("chart").innerHTML = g +
-    `<path d="${path(M,1.05)}" fill="none" stroke="var(--buy)" stroke-width="1.5" stroke-dasharray="4 3"/>
-     <path d="${path(M,0.95)}" fill="none" stroke="var(--sell)" stroke-width="1.5" stroke-dasharray="4 3"/>
-     <path d="${path(M)}" fill="none" stroke="var(--sma)" stroke-width="1.5" opacity=".7"/>
-     <path d="${path(P)}" fill="none" stroke="var(--price)" stroke-width="2"/>
-     <circle cx="${x(N-1)}" cy="${y(P[N-1])}" r="4" fill="var(--price)"/>`;
+  let g="";
+  for(let s2=0;s2<=4;s2++){ const v=lo+(hi-lo)*s2/4;
+    g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${pl-6}" y="${y(v)+4}" text-anchor="end">${v>=1e5?Math.round(v/1000):(v/1000).toFixed(v<1e4?1:0)}k</text>`; }
+  [0,Math.floor((N-1)/2),N-1].forEach((i,k)=>{ g+=`<text x="${x(i)}" y="${H-8}" text-anchor="${k===0?'start':k===2?'end':'middle'}">${W<520?new Date(D[i]+"T12:00:00Z").toLocaleDateString("es-CO",{month:"short",year:"2-digit",timeZone:"UTC"}):fmtDate(D[i])}</text>`; });
+  if(show.bands){ // shaded band
+    const up=M.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)} ${y(v*1.05).toFixed(1)}`).join(""), dn=M.map((v,i)=>`L${x(N-1-i).toFixed(1)} ${y(M[N-1-i]*0.95).toFixed(1)}`).join("");
+    g+=`<path d="${up}${dn}Z" fill="var(--muted)" opacity=".08"/>`;
+    g+=`<path d="${path(M,1.05)}" fill="none" stroke="var(--buy)" stroke-width="1.5" stroke-dasharray="5 4"/><path d="${path(M,0.95)}" fill="none" stroke="var(--sell)" stroke-width="1.5" stroke-dasharray="5 4"/>`; }
+  if(show.sma) g+=`<path d="${path(M)}" fill="none" stroke="var(--sma)" stroke-width="1.6" opacity=".75"/>`;
+  if(show.price) g+=`<path d="${path(P)}" fill="none" stroke="var(--price)" stroke-width="2.2" stroke-linejoin="round"/>`;
+  // signal markers
+  for(let i=0;i<N;i++){ const k=sig.get(start+i); if(!k) continue; const cx=x(i), cy=y(P[i]);
+    g+= k==="buy" ? `<path d="M${cx} ${cy+8} l7 12 h-14z" fill="var(--buy)" stroke="var(--card)" stroke-width="1.5"/>` : `<path d="M${cx} ${cy-8} l7 -12 h-14z" fill="var(--sell)" stroke="var(--card)" stroke-width="1.5"/>`; }
+  g+=`<circle cx="${x(N-1)}" cy="${y(P[N-1])}" r="4" fill="var(--price)"/>`;
+  g+=`<g id="hover" style="display:none"><line id="hx" y1="${pt}" y2="${H-pb}" stroke="var(--muted)" stroke-dasharray="3 3"/><circle id="hp" r="5" fill="var(--price)" stroke="var(--card)" stroke-width="2"/><circle id="hm" r="4" fill="var(--sma)" stroke="var(--card)" stroke-width="2"/></g>`;
+  g+=`<rect id="hit" x="${pl}" y="${pt}" width="${W-pl-pr}" height="${H-pt-pb}" fill="transparent"/>`;
+  $("chart").innerHTML=g;
+  chartGeo={N,start,P,M,D,x,y,W,pl,pr,sig};
+  const hit=$("hit");
+  const move=e=>{ const svg=$("chart"), rect=svg.getBoundingClientRect(); const sx=(e.clientX-rect.left)*W/rect.width;
+    const i=Math.max(0,Math.min(N-1,Math.round((sx-pl)/((W-pl-pr)/(N-1))))); hover(i,rect); };
+  hit.addEventListener("pointermove",move); hit.addEventListener("pointerdown",move);
+  hit.addEventListener("pointerleave",e=>{ if(e.pointerType==="mouse") hideHover(); });
 }
+function hover(i,rect){
+  const G=chartGeo; const {P,M,D,x,y,W}=G; const h=$("hover"); h.style.display="";
+  $("hx").setAttribute("x1",x(i)); $("hx").setAttribute("x2",x(i));
+  const hp=$("hp"), hm=$("hm");
+  hp.style.display=show.price?"":"none"; hm.style.display=show.sma?"":"none";
+  hp.setAttribute("cx",x(i)); hp.setAttribute("cy",y(P[i])); hm.setAttribute("cx",x(i)); hm.setAttribute("cy",y(M[i]));
+  const k=G.sig.get(G.start+i), rel=P[i]/M[i]-1;
+  const tip=$("tip");
+  tip.innerHTML=`<b>${fmtDate(D[i])}</b>
+    <div class="r"><span>Cierre</span><span class="num">${fmt(P[i])}</span></div>
+    <div class="r"><span>Media 200</span><span class="num">${fmt(M[i])}</span></div>
+    <div class="r"><span>Banda compra</span><span class="num">${fmt(M[i]*1.05)}</span></div>
+    <div class="r"><span>Banda venta</span><span class="num">${fmt(M[i]*0.95)}</span></div>
+    <div class="r"><span>Vs. media</span><span class="num">${(rel>0?"+":"−")+pa(rel)}</span></div>
+    ${k?`<div class="sig" style="color:${k==="buy"?"var(--buy)":"var(--sell)"}">${k==="buy"?"Señal de compra":"Señal de venta"}</div>`:""}`;
+  tip.style.display="block";
+  const px=x(i)*rect.width/W, tw=tip.offsetWidth, ww=$("chartwrap").clientWidth;
+  let left=px+14; if(left+tw>ww) left=px-tw-14; if(left<0) left=0;
+  tip.style.left=left+"px"; tip.style.top="6px";
+}
+function hideHover(){ const h=$("hover"); if(h) h.style.display="none"; $("tip").style.display="none"; }
+document.querySelectorAll(".ranges button").forEach(b=>b.onclick=()=>{ chartRange=b.dataset.r==="all"?"all":+b.dataset.r;
+  document.querySelectorAll(".ranges button").forEach(o=>o.setAttribute("aria-pressed",String(o===b))); hideHover(); if(lastR) drawChart(lastR); });
+document.querySelectorAll(".legend button").forEach(b=>b.onclick=()=>{ const k=b.dataset.s; show[k]=!show[k]; b.setAttribute("aria-pressed",String(show[k])); hideHover(); if(lastR) drawChart(lastR); });
+let rsz; window.addEventListener("resize",()=>{ clearTimeout(rsz); rsz=setTimeout(()=>{ hideHover(); if(lastR) drawChart(lastR); },150); });
+document.addEventListener("pointerdown",e=>{ if(!$("chartwrap").contains(e.target)) hideHover(); });
 
 function renderCloses(r){
   const last = r.ser.slice(-7).reverse(), addedSet = new Set(state.added.map(a=>a[0]));
