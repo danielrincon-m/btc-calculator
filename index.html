@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculadora regla SMA200 ± 5% · BTC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF2F6; --card:#FFFFFF; --ink:#14213D; --muted:#5B6782; --line:#D5DCE6;
+  --buy:#C98A00; --sell:#B23A48; --in:#2E7D5B; --sma:#14213D; --price:#3D5AFE;
+  --chip:#E3E9F1;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1626; --card:#172036; --ink:#E7ECF5; --muted:#97A3BC; --line:#2A3550;
+    --buy:#E8B23A; --sell:#E06A78; --in:#5BC496; --sma:#E7ECF5; --price:#8C9EFF; --chip:#212C47;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1626; --card:#172036; --ink:#E7ECF5; --muted:#97A3BC; --line:#2A3550;
+  --buy:#E8B23A; --sell:#E06A78; --in:#5BC496; --sma:#E7ECF5; --price:#8C9EFF; --chip:#212C47;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums}
+main{max-width:760px;margin:0 auto;padding:28px 18px 64px}
+h1{font-size:15px;font-weight:600;color:var(--muted);margin:0 0 18px;letter-spacing:.01em}
+h2{font-size:19px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 16px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-top:16px}
+#verdict{font-size:clamp(28px,6vw,40px);line-height:1.15;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
+#verdictSub{font-size:16px;color:var(--muted);margin:0}
+.hero{background:transparent;border:none;padding:4px 0 0;margin-top:0}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--chip);color:var(--ink);margin-bottom:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+/* lane */
+.lane{position:relative;height:96px;margin:26px 0 8px}
+.track{position:absolute;left:0;right:0;top:44px;height:10px;border-radius:5px;background:var(--chip);overflow:hidden}
+.zone{position:absolute;top:0;bottom:0}
+.zone.sellz{background:color-mix(in srgb,var(--sell) 28%,transparent)}
+.zone.midz{background:color-mix(in srgb,var(--muted) 16%,transparent)}
+.zone.buyz{background:color-mix(in srgb,var(--buy) 30%,transparent)}
+.tick{position:absolute;top:36px;width:2px;height:26px;transform:translateX(-1px)}
+.tlabel{position:absolute;top:66px;transform:translateX(-50%);font-size:12px;color:var(--muted);white-space:nowrap;text-align:center;line-height:1.25}
+.tlabel b{display:block;color:var(--ink);font-weight:600;font-size:13px}
+.marker{position:absolute;top:0;transform:translateX(-50%);text-align:center;transition:left .35s ease}
+.marker .val{font-weight:700;font-size:15px;background:var(--price);color:#fff;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.marker .stem{width:2px;height:16px;background:var(--price);margin:0 auto}
+.marker .knob{width:14px;height:14px;border-radius:50%;background:var(--price);border:3px solid var(--card);margin:-2px auto 0;box-shadow:0 0 0 1px var(--price)}
+@media (prefers-reduced-motion:reduce){.marker{transition:none}}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}
+.stat{border-top:3px solid var(--line);padding-top:8px}
+.stat span{display:block;font-size:13px;color:var(--muted)}
+.stat strong{font-size:20px;font-weight:600}
+.stat.s{border-color:var(--sell)} .stat.m{border-color:var(--sma)} .stat.b{border-color:var(--buy)}
+.tomorrow{margin-top:18px;padding:12px 14px;border-radius:10px;background:var(--chip);font-size:15px}
+/* forms */
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%}
+textarea{min-height:86px;resize:vertical;font-size:14px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid color-mix(in srgb,var(--price) 55%,transparent);outline-offset:1px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row>div{flex:1 1 150px}
+button{font:inherit;font-weight:600;border:1px solid var(--ink);background:var(--ink);color:var(--card);border-radius:8px;padding:9px 14px;cursor:pointer;white-space:nowrap}
+button.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.seg{display:flex;max-width:100%;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{flex:1 1 auto;padding:9px 12px;border:none;border-radius:0;background:transparent;color:var(--ink);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--card)}
+.msg{font-size:14px;margin-top:8px;min-height:1em}
+.msg.err{color:var(--sell)} .msg.ok{color:var(--in)}
+.closes{margin-top:14px;width:100%;border-collapse:collapse;font-size:14px}
+.closes td{padding:6px 2px;border-bottom:1px solid var(--line)}
+.closes td:last-child{text-align:right}
+.tag{font-size:11px;color:var(--muted);margin-left:6px}
+.chartwrap{overflow-x:auto;margin-top:6px}
+svg text{fill:var(--muted);font-size:11px;font-family:inherit}
+.out{margin-top:16px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.out div{background:var(--chip);border-radius:10px;padding:10px 12px}
+.out span{display:block;font-size:13px;color:var(--muted)}
+.out strong{font-size:18px;font-weight:600}
+.log{margin-top:14px;font-size:14px}
+.log li{padding:8px 0;border-bottom:1px solid var(--line);list-style:none;display:flex;gap:10px;justify-content:space-between}
+.log ul{padding:0;margin:0}
+details summary{cursor:pointer;font-weight:600;font-size:17px}
+details p{color:var(--muted);font-size:15px;max-width:68ch}
+.saved{font-size:12px;color:var(--muted);margin-top:22px;text-align:center}
+@media (max-width:520px){.grid3{grid-template-columns:1fr 1fr 1fr;gap:6px}.stat strong{font-size:16px}.out{grid-template-columns:1fr}.tlabel{font-size:11px}.tlabel b{font-size:12px}}
+</style>
+</head>
+<body>
+<main>
+<h1>Bitcoin · regla de la media de 200 días con bandas del 5%</h1>
+
+<section class="hero" aria-live="polite">
+  <div class="pill"><span class="dot" id="stateDot"></span><span id="stateText">—</span></div>
+  <p id="verdict">Cargando…</p>
+  <p id="verdictSub"></p>
+  <div class="lane" id="lane" aria-hidden="true"></div>
+  <div class="grid3">
+    <div class="stat s"><span>Banda de venta</span><strong class="num" id="vSell">—</strong></div>
+    <div class="stat m"><span>Media 200 días</span><strong class="num" id="vSma">—</strong></div>
+    <div class="stat b"><span>Banda de compra</span><strong class="num" id="vBuy">—</strong></div>
+  </div>
+  <div class="tomorrow num" id="tomorrow"></div>
+</section>
+
+<section>
+  <h2>Mi estado</h2>
+  <p class="sub">La calculadora deduce tu estado aplicando la regla al historial. Si tú operaste distinto, márcalo aquí.</p>
+  <div class="row" style="align-items:center">
+    <div class="seg" role="group" aria-label="Mi estado">
+      <button id="stAuto" aria-pressed="true">Según la regla</button>
+      <button id="stIn" aria-pressed="false">Con BTC</button>
+      <button id="stOut" aria-pressed="false">En dólares</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Probar un cierre</h2>
+  <p class="sub">Escribe un precio para ver qué diría la regla si el día de hoy cerrara ahí. No se guarda.</p>
+  <div class="row">
+    <div><label for="tryPrice">Precio de cierre hipotético (USD)</label><input id="tryPrice" class="num" inputmode="decimal" placeholder="Ej. 80000"></div>
+    <div style="flex:0 0 auto"><button class="ghost" id="tryClear">Volver al último cierre</button></div>
+    <div style="flex:0 0 auto"><button class="ghost" id="refresh">Actualizar precios</button></div>
+  </div>
+</section>
+
+<section>
+  <h2>Cierres diarios</h2>
+  <p class="msg" id="srcNote"></p>
+  <p class="sub">Si la descarga automática falla, agrega los cierres a mano. El cierre es el precio a las 00:00 UTC (7:00 p.m. en Colombia). Usa siempre la misma fuente, por ejemplo el gráfico diario de BTCUSD en CoinMarketCap o TradingView.</p>
+  <div class="row">
+    <div><label for="cDate">Fecha del cierre</label><input id="cDate" type="date"></div>
+    <div><label for="cPrice">Precio de cierre (USD)</label><input id="cPrice" class="num" inputmode="decimal" placeholder="Ej. 83250"></div>
+    <div style="flex:0 0 auto"><button id="addClose">Agregar cierre</button></div>
+  </div>
+  <div class="msg" id="addMsg"></div>
+  <details style="margin-top:10px">
+    <summary style="font-size:14px">Pegar varios cierres a la vez</summary>
+    <p style="font-size:14px">Una línea por día con fecha y precio, por ejemplo <span class="num">2026-10-11, 83877</span>. Deben ser días seguidos después del último registrado.</p>
+    <textarea id="bulk" class="num" placeholder="2026-10-11, 83877&#10;2026-10-12, 84120"></textarea>
+    <div class="row" style="margin-top:8px"><div style="flex:0 0 auto"><button class="ghost" id="addBulk">Agregar todos</button></div></div>
+  </details>
+  <table class="closes num" id="closesTbl"></table>
+  <div class="row" style="margin-top:10px"><div style="flex:0 0 auto"><button class="ghost" id="undoClose">Borrar el último cierre agregado</button></div></div>
+</section>
+
+<section>
+  <h2>Últimos 200 días</h2>
+  <p class="sub">Precio, media de 200 días y las dos bandas.</p>
+  <div class="chartwrap"><svg id="chart" viewBox="0 0 720 260" width="100%" role="img" aria-label="Gráfico del precio con la media de 200 días y las bandas"></svg></div>
+</section>
+
+<section>
+  <h2>Tamaño de la operación</h2>
+  <p class="sub">Cuánto BTC compras con tu capital, cuánto pagas de comisión y cuánto perderías si saliera por la banda de venta.</p>
+  <div class="row">
+    <div><label for="capital">Capital (USD)</label><input id="capital" class="num" inputmode="decimal" value="5000"></div>
+    <div><label for="fee">Plataforma</label>
+      <select id="fee"><option value="0.003">ARQ Standard (0,30%)</option><option value="0.002">ARQ Premium (0,20%)</option><option value="0.0015">ARQ Prestige (0,15%)</option><option value="0.01">eToro (1%)</option></select></div>
+    <div><label for="entry">Precio de compra (USD)</label><input id="entry" class="num" inputmode="decimal"></div>
+  </div>
+  <div class="out num">
+    <div><span>BTC que recibes</span><strong id="oQty">—</strong></div>
+    <div><span>Comisión de compra</span><strong id="oFee">—</strong></div>
+    <div><span>Si vendieras hoy en la banda de venta</span><strong id="oExit">—</strong></div>
+    <div><span>Resultado en ese caso, con comisiones</span><strong id="oPL">—</strong></div>
+  </div>
+</section>
+
+<section>
+  <h2>Bitácora</h2>
+  <p class="sub">Anota cada compra o venta y por qué. Te ayuda a comprobar que sigues la regla.</p>
+  <div class="row">
+    <div style="flex:0 0 130px"><label for="lAct">Acción</label><select id="lAct"><option>Compra</option><option>Venta</option><option>Nota</option></select></div>
+    <div style="flex:0 0 150px"><label for="lPrice">Precio</label><input id="lPrice" class="num" inputmode="decimal"></div>
+    <div><label for="lNote">Comentario</label><input id="lNote" placeholder="Ej. cierre sobre la banda de compra"></div>
+    <div style="flex:0 0 auto"><button id="addLog">Anotar</button></div>
+  </div>
+  <div class="log"><ul id="logList"></ul></div>
+</section>
+
+<section>
+  <details>
+    <summary>Cómo funciona la regla</summary>
+    <p>Cada día, después del cierre, compara el precio con la media de los últimos 200 cierres. Si estás en dólares y el cierre queda más de un 5% por encima de la media, compras al día siguiente. Si tienes BTC y el cierre queda más de un 5% por debajo, vendes todo al día siguiente. Entre las dos bandas no haces nada.</p>
+    <p>La banda de venta es tu stop: no hay otro. Tampoco hay objetivo de ganancia: te quedas mientras la tendencia siga viva. Las decisiones se toman solo con el cierre diario, no con los movimientos durante el día.</p>
+    <p>Para que la media sea correcta hacen falta todos los cierres, sin días saltados. Si te faltan días, la calculadora te avisa.</p>
+  </details>
+</section>
+<p class="saved" id="savedNote">Los datos que agregas se guardan en este navegador.</p>
+</main>
+
+<script>
+let HIST = [["2025-02-18",95539.55],["2025-02-19",96635.61],["2025-02-20",98333.94],["2025-02-21",96125.55],["2025-02-22",96577.76],["2025-02-23",96273.92],["2025-02-24",91418.17],["2025-02-25",88736.17],["2025-02-26",84347.02],["2025-02-27",84704.23],["2025-02-28",84373.01],["2025-03-01",86031.91],["2025-03-02",94248.35],["2025-03-03",86065.67],["2025-03-04",87222.2],["2025-03-05",90623.56],["2025-03-06",89961.73],["2025-03-07",86742.67],["2025-03-08",86154.59],["2025-03-09",80601.04],["2025-03-10",78532.0],["2025-03-11",82862.21],["2025-03-12",83722.36],["2025-03-13",81066.7],["2025-03-14",83969.1],["2025-03-15",84343.11],["2025-03-16",82579.69],["2025-03-17",84075.69],["2025-03-18",82718.5],["2025-03-19",86854.23],["2025-03-20",84167.2],["2025-03-21",84043.24],["2025-03-22",83832.48],["2025-03-23",86054.38],["2025-03-24",87498.91],["2025-03-25",87471.7],["2025-03-26",86900.88],["2025-03-27",87177.1],["2025-03-28",84353.15],["2025-03-29",82597.59],["2025-03-30",82334.52],["2025-03-31",82548.91],["2025-04-01",85169.17],["2025-04-02",82485.71],["2025-04-03",83102.83],["2025-04-04",83843.8],["2025-04-05",83504.8],["2025-04-06",78214.48],["2025-04-07",79235.34],["2025-04-08",76271.95],["2025-04-09",82573.95],["2025-04-10",79626.14],["2025-04-11",83404.84],["2025-04-12",85287.11],["2025-04-13",83684.98],["2025-04-14",84542.39],["2025-04-15",83668.99],["2025-04-16",84033.87],["2025-04-17",84895.75],["2025-04-18",84450.8],["2025-04-19",85063.41],["2025-04-20",85174.3],["2025-04-21",87518.91],["2025-04-22",93441.89],["2025-04-23",93699.11],["2025-04-24",93943.8],["2025-04-25",94720.5],["2025-04-26",94646.93],["2025-04-27",93754.84],["2025-04-28",94978.75],["2025-04-29",94284.79],["2025-04-30",94207.31],["2025-05-01",96492.34],["2025-05-02",96910.07],["2025-05-03",95891.8],["2025-05-04",94315.98],["2025-05-05",94748.05],["2025-05-06",96802.48],["2025-05-07",97032.32],["2025-05-08",103241.46],["2025-05-09",102970.85],["2025-05-10",104696.33],["2025-05-11",104106.36],["2025-05-12",102812.95],["2025-05-13",104169.81],["2025-05-14",103539.41],["2025-05-15",103744.64],["2025-05-16",103489.29],["2025-05-17",103191.09],["2025-05-18",106446.01],["2025-05-19",105606.18],["2025-05-20",106791.09],["2025-05-21",109678.08],["2025-05-22",111673.28],["2025-05-23",107287.8],["2025-05-24",107791.16],["2025-05-25",109035.39],["2025-05-26",109440.37],["2025-05-27",108994.64],["2025-05-28",107802.33],["2025-05-29",105641.76],["2025-05-30",103998.57],["2025-05-31",104638.09],["2025-06-01",105652.1],["2025-06-02",105881.53],["2025-06-03",105432.47],["2025-06-04",104731.98],["2025-06-05",101575.95],["2025-06-06",104390.34],["2025-06-07",105615.62],["2025-06-08",105793.65],["2025-06-09",110294.1],["2025-06-10",110257.23],["2025-06-11",108686.62],["2025-06-12",105929.05],["2025-06-13",106090.97],["2025-06-14",105472.41],["2025-06-15",105552.02],["2025-06-16",106796.76],["2025-06-17",104601.12],["2025-06-18",104883.33],["2025-06-19",104684.29],["2025-06-20",103309.6],["2025-06-21",102257.41],["2025-06-22",100987.14],["2025-06-23",105577.77],["2025-06-24",106045.63],["2025-06-25",107361.26],["2025-06-26",106960.0],["2025-06-27",107088.43],["2025-06-28",107327.7],["2025-06-29",108385.57],["2025-06-30",107135.34],["2025-07-01",105698.28],["2025-07-02",108859.32],["2025-07-03",109647.98],["2025-07-04",108034.34],["2025-07-05",108231.18],["2025-07-06",109232.07],["2025-07-07",108299.85],["2025-07-08",108950.27],["2025-07-09",111326.55],["2025-07-10",115987.2],["2025-07-11",117516.99],["2025-07-12",117435.23],["2025-07-13",119116.12],["2025-07-14",119849.7],["2025-07-15",117777.19],["2025-07-16",118738.51],["2025-07-17",119289.84],["2025-07-18",118003.23],["2025-07-19",117939.98],["2025-07-20",117300.79],["2025-07-21",117439.54],["2025-07-22",119995.41],["2025-07-23",118754.96],["2025-07-24",118368.0],["2025-07-25",117635.88],["2025-07-26",117947.37],["2025-07-27",119448.49],["2025-07-28",117924.48],["2025-07-29",117922.15],["2025-07-30",117831.19],["2025-07-31",115758.2],["2025-08-01",113320.09],["2025-08-02",112526.91],["2025-08-03",114217.67],["2025-08-04",115071.88],["2025-08-05",114141.45],["2025-08-06",115028.0],["2025-08-07",117496.9],["2025-08-08",116688.73],["2025-08-09",116500.36],["2025-08-10",119306.76],["2025-08-11",118731.45],["2025-08-12",120172.91],["2025-08-13",123344.06],["2025-08-14",118359.58],["2025-08-15",117398.35],["2025-08-16",117491.35],["2025-08-17",117453.06],["2025-08-18",116252.31],["2025-08-19",112831.18],["2025-08-20",114274.74],["2025-08-21",112419.03],["2025-08-22",116874.09],["2025-08-23",115374.33],["2025-08-24",113458.43],["2025-08-25",110124.35],["2025-08-26",111802.66],["2025-08-27",111222.06],["2025-08-28",112544.8],["2025-08-29",108410.84],["2025-08-30",108808.07],["2025-08-31",108236.71],["2025-09-01",109250.59],["2025-09-02",111200.59],["2025-09-03",111723.21],["2025-09-04",110723.6],["2025-09-05",110650.98],["2025-09-06",110224.7],["2025-09-07",111167.62],["2025-09-08",112071.43],["2025-09-09",111530.55],["2025-09-10",113955.36],["2025-09-11",115507.54],["2025-09-12",116101.58],["2025-09-13",115950.51],["2025-09-14",115407.66],["2025-09-15",115444.88],["2025-09-16",116843.19],["2025-09-17",116468.51],["2025-09-18",117137.2],["2025-09-19",115688.86],["2025-09-20",115721.96],["2025-09-21",115306.09],["2025-09-22",112748.51],["2025-09-23",112014.5],["2025-09-24",113328.63],["2025-09-25",109049.29],["2025-09-26",109712.83],["2025-09-27",109681.95],["2025-09-28",112122.64],["2025-09-29",114400.38],["2025-09-30",114056.09],["2025-10-01",118648.93],["2025-10-02",120681.26],["2025-10-03",122266.53],["2025-10-04",122425.43],["2025-10-05",123513.48],["2025-10-06",124752.53],["2025-10-07",121451.38],["2025-10-08",123354.87],["2025-10-09",121705.59],["2025-10-10",113214.37],["2025-10-11",110807.88],["2025-10-12",115169.77],["2025-10-13",115271.08],["2025-10-14",113118.66],["2025-10-15",110783.16],["2025-10-16",108186.04],["2025-10-17",106467.79],["2025-10-18",107198.27],["2025-10-19",108666.71],["2025-10-20",110588.93],["2025-10-21",108476.89],["2025-10-22",107688.59],["2025-10-23",110069.73],["2025-10-24",111033.92],["2025-10-25",111641.73],["2025-10-26",114472.45],["2025-10-27",114119.33],["2025-10-28",112956.16],["2025-10-29",110055.3],["2025-10-30",108305.55],["2025-10-31",109556.16],["2025-11-01",110064.02],["2025-11-02",110639.62],["2025-11-03",106547.52],["2025-11-04",101590.52],["2025-11-05",103891.84],["2025-11-06",101301.29],["2025-11-07",103372.41],["2025-11-08",102282.12],["2025-11-09",104719.64],["2025-11-10",105996.59],["2025-11-11",102997.47],["2025-11-12",101663.19],["2025-11-13",99697.49],["2025-11-14",94397.79],["2025-11-15",95549.15],["2025-11-16",94177.08],["2025-11-17",92093.88],["2025-11-18",92948.88],["2025-11-19",91465.99],["2025-11-20",86631.9],["2025-11-21",85090.69],["2025-11-22",84648.36],["2025-11-23",86805.01],["2025-11-24",88270.56],["2025-11-25",87341.89],["2025-11-26",90518.37],["2025-11-27",91285.38],["2025-11-28",90919.27],["2025-11-29",90851.76],["2025-11-30",90394.31],["2025-12-01",86321.57],["2025-12-02",91350.2],["2025-12-03",93527.8],["2025-12-04",92141.62],["2025-12-05",89387.76],["2025-12-06",89272.38],["2025-12-07",90405.64],["2025-12-08",90640.2],["2025-12-09",92691.71],["2025-12-10",92020.95],["2025-12-11",92511.34],["2025-12-12",90270.41],["2025-12-13",90298.71],["2025-12-14",88175.18],["2025-12-15",86419.78],["2025-12-16",87843.98],["2025-12-17",86143.76],["2025-12-18",85462.51],["2025-12-19",88103.38],["2025-12-20",88344.0],["2025-12-21",88621.75],["2025-12-22",88490.02],["2025-12-23",87414.0],["2025-12-24",87611.96],["2025-12-25",87234.74],["2025-12-26",87301.43],["2025-12-27",87802.16],["2025-12-28",87835.84],["2025-12-29",87138.14],["2025-12-30",88430.13],["2025-12-31",87508.83],["2026-01-01",88731.98],["2026-01-02",89944.7],["2026-01-03",90603.19],["2026-01-04",91413.49],["2026-01-05",93882.55],["2026-01-06",93729.03],["2026-01-07",91308.05],["2026-01-08",91027.12],["2026-01-09",90513.1],["2026-01-10",90386.65],["2026-01-11",90827.46],["2026-01-12",91192.99],["2026-01-13",95321.78],["2026-01-14",96929.33],["2026-01-15",95551.19],["2026-01-16",95525.12],["2026-01-17",95099.92],["2026-01-18",93634.43],["2026-01-19",92553.59],["2026-01-20",88310.91],["2026-01-21",89376.96],["2026-01-22",89462.45],["2026-01-23",89503.88],["2026-01-24",89110.73],["2026-01-25",86572.22],["2026-01-26",88267.14],["2026-01-27",89102.57],["2026-01-28",89184.57],["2026-01-29",84561.59],["2026-01-30",84128.66],["2026-01-31",78621.12],["2026-02-01",76974.45],["2026-02-02",78688.77],["2026-02-03",75633.55],["2026-02-04",73019.7],["2026-02-05",62702.1],["2026-02-06",70555.39],["2026-02-07",69281.97],["2026-02-08",70264.73],["2026-02-09",70120.78],["2026-02-10",68793.96],["2026-02-11",66991.97],["2026-02-12",66221.84],["2026-02-13",68857.84],["2026-02-14",69767.62],["2026-02-15",68788.19],["2026-02-16",68843.16],["2026-02-17",67494.22],["2026-02-18",66425.32],["2026-02-19",66957.52],["2026-02-20",68005.42],["2026-02-21",68003.77],["2026-02-22",67659.39],["2026-02-23",64616.74],["2026-02-24",64080.04],["2026-02-25",67960.12],["2026-02-26",67453.77],["2026-02-27",65881.8],["2026-02-28",66995.86],["2026-03-01",65738.1],["2026-03-02",68775.85],["2026-03-03",68293.65],["2026-03-04",72710.58],["2026-03-05",70841.12],["2026-03-06",68136.49],["2026-03-07",67272.59],["2026-03-08",65969.78],["2026-03-09",68402.38],["2026-03-10",69926.92],["2026-03-11",70204.88],["2026-03-12",70493.46],["2026-03-13",70968.27],["2026-03-14",71214.62],["2026-03-15",72789.91],["2026-03-16",74861.09],["2026-03-17",73922.48],["2026-03-18",71245.58],["2026-03-19",69912.79],["2026-03-20",70522.59],["2026-03-21",68711.52],["2026-03-22",67845.21],["2026-03-23",70914.86],["2026-03-24",70517.86],["2026-03-25",71309.88],["2026-03-26",68791.62],["2026-03-27",66338.38],["2026-03-28",66319.7],["2026-03-29",65954.92],["2026-03-30",66691.45],["2026-03-31",68233.31],["2026-04-01",68078.55],["2026-04-02",66888.57],["2026-04-03",66931.1],["2026-04-04",67290.52],["2026-04-05",68981.9],["2026-04-06",68859.83],["2026-04-07",71940.7],["2026-04-08",71123.36],["2026-04-09",71767.83],["2026-04-10",72979.05],["2026-04-11",73054.27],["2026-04-12",70753.41],["2026-04-13",74484.64],["2026-04-14",74181.61],["2026-04-15",74805.08],["2026-04-16",75152.13],["2026-04-17",77126.88],["2026-04-18",75726.21],["2026-04-19",73856.35],["2026-04-20",75872.52],["2026-04-21",76352.77],["2026-04-22",78203.1],["2026-04-23",78268.95],["2026-04-24",77455.31],["2026-04-25",77612.02],["2026-04-26",78657.54],["2026-04-27",77366.62],["2026-04-28",76350.67],["2026-04-29",75776.13],["2026-04-30",76304.32],["2026-05-01",78179.0],["2026-05-02",78657.25],["2026-05-03",78538.23],["2026-05-04",79827.91],["2026-05-05",80927.05],["2026-05-06",81427.53],["2026-05-07",80009.99],["2026-05-08",80186.77],["2026-05-09",80664.37],["2026-05-10",82138.93],["2026-05-11",81728.3],["2026-05-12",80477.49],["2026-05-13",79277.12],["2026-05-14",81051.25],["2026-05-15",79065.68],["2026-05-16",78131.44],["2026-05-17",77429.35],["2026-05-18",76954.17],["2026-05-19",76750.91],["2026-05-20",77457.77],["2026-05-21",77539.17],["2026-05-22",75488.24],["2026-05-23",76673.37],["2026-05-24",76981.12],["2026-05-25",77279.93],["2026-05-26",75825.73],["2026-05-27",74344.7],["2026-05-28",73536.55],["2026-05-29",73372.52],["2026-05-30",73754.84],["2026-05-31",73579.69],["2026-06-01",71319.77],["2026-06-02",66703.66],["2026-06-03",64014.37],["2026-06-04",63801.57],["2026-06-05",60922.67],["2026-06-06",60867.41],["2026-06-07",63239.52],["2026-06-08",63090.59],["2026-06-09",61643.78],["2026-06-10",61449.29],["2026-06-11",63561.05],["2026-06-12",63543.2],["2026-06-13",64421.32],["2026-06-14",65710.4],["2026-06-15",66289.5],["2026-06-16",65600.64],["2026-06-17",64418.45],["2026-06-18",62896.47],["2026-06-19",63540.84],["2026-06-20",64239.68],["2026-06-21",63237.54],["2026-06-22",63952.11],["2026-06-23",62668.02],["2026-06-24",60995.13],["2026-06-25",59721.68],["2026-06-26",60016.43],["2026-06-27",59940.1],["2026-06-28",59532.34],["2026-06-29",60138.38],["2026-06-30",58558.86],["2026-07-01",60003.76],["2026-07-02",61485.3],["2026-07-03",62544.2],["2026-07-04",63088.3],["2026-07-05",63547.88],["2026-07-06",63995.02],["2026-07-07",63297.39],["2026-07-08",62257.57],["2026-07-09",63193.15],["2026-07-10",64127.14],["2026-07-11",63802.03],["2026-07-12",63758.22],["2026-07-13",62239.12],["2026-07-14",64956.11],["2026-07-15",64712.38],["2026-07-16",63789.28],["2026-07-17",63899.46],["2026-07-18",64796.6],["2026-07-19",64690.8],["2026-07-20",65230.03],["2026-07-21",66505.12],["2026-07-22",66100.8],["2026-07-23",65044.81],["2026-07-24",64098.5],["2026-07-25",64311.81],["2026-07-26",65340.3],["2026-07-27",63724.9],["2026-07-28",63871.36],["2026-07-29",63908.17],["2026-07-30",64725.31],["2026-07-31",62813.75],["2026-08-01",62763.32],["2026-08-02",63482.0],["2026-08-03",63460.9],["2026-08-04",64055.95],["2026-08-05",64597.5],["2026-08-06",64262.11],["2026-08-07",64880.19],["2026-08-08",64904.69],["2026-08-09",64844.89],["2026-08-10",63910.59],["2026-08-11",63551.88],["2026-08-12",63402.43],["2026-08-13",63402.17],["2026-08-14",62975.59],["2026-08-15",63024.32],["2026-08-16",62818.65],["2026-08-17",64506.25],["2026-08-18",64680.71],["2026-08-19",69266.19],["2026-08-20",73032.76],["2026-08-21",78335.19],["2026-08-22",77083.41],["2026-08-23",77755.27],["2026-08-24",78964.48],["2026-08-25",78564.98],["2026-08-26",79027.42],["2026-08-27",80257.54],["2026-08-28",77830.29],["2026-08-29",78245.81],["2026-08-30",77667.57],["2026-08-31",78548.63],["2026-09-01",77403.62],["2026-09-02",77300.48],["2026-09-03",81271.74],["2026-09-04",79671.97],["2026-09-05",79823.87],["2026-09-06",80350.05],["2026-09-07",79115.85],["2026-09-08",78438.58],["2026-09-09",78259.52],["2026-09-10",76568.12],["2026-09-11",77173.8],["2026-09-12",77270.47],["2026-09-13",76838.16],["2026-09-14",78163.38],["2026-09-15",75612.51],["2026-09-16",76150.32],["2026-09-17",76403.77],["2026-09-18",80901.46],["2026-09-19",81233.68],["2026-09-20",81142.61],["2026-09-21",86602.91],["2026-09-22",86172.28],["2026-09-23",84383.01],["2026-09-24",84379.06],["2026-09-25",84034.92],["2026-09-26",84406.45],["2026-09-27",84458.09],["2026-09-28",83502.61],["2026-09-29",83622.43],["2026-09-30",83553.85],["2026-10-01",84853.1],["2026-10-02",84497.21],["2026-10-03",84763.58],["2026-10-04",86480.3],["2026-10-05",85786.59],["2026-10-06",85557.56],["2026-10-07",83275.93],["2026-10-08",81676.34],["2026-10-09",82546.32],["2026-10-10",82912.23]];
+const $ = id => document.getElementById(id);
+const fmt = (v,d=0) => isFinite(v) ? "$" + v.toLocaleString("es-CO",{minimumFractionDigits:d,maximumFractionDigits:d}) : "—";
+const pa = v => (Math.abs(v)*100).toLocaleString("es-CO",{maximumFractionDigits:1}) + "%";
+const pct = v => (v>0?"+":"") + (v*100).toLocaleString("es-CO",{maximumFractionDigits:1}) + "%";
+const parseNum = s => { if(s==null) return NaN; s=String(s).trim().replace(/\s|\$/g,""); if(!s) return NaN;
+  // accept 83,877.5 or 83.877,5 or 83877
+  if(/,\d{1,2}$/.test(s) && s.includes(".")) s=s.replace(/\./g,"").replace(",",".");
+  else if(/,\d{1,2}$/.test(s)) s=s.replace(",",".");
+  else s=s.replace(/,/g,"");
+  return parseFloat(s); };
+const addDay = (d,n=1) => { const t=new Date(d+"T00:00:00Z"); t.setUTCDate(t.getUTCDate()+n); return t.toISOString().slice(0,10); };
+const dayDiff = (a,b) => Math.round((new Date(b+"T00:00:00Z")-new Date(a+"T00:00:00Z"))/864e5);
+const fmtDate = d => new Date(d+"T12:00:00Z").toLocaleDateString("es-CO",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"});
+
+let state = { added: [], myState: "auto", capital: 5000, fee: 0.003, log: [] };
+let tryPrice = null;
+let store = null; // {save(obj)}
+
+function series(){ return HIST.concat(state.added); }
+function sma(closes,end){ let s=0; for(let i=end-199;i<=end;i++) s+=closes[i]; return s/200; }
+
+function ruleState(closes){
+  let st="out";
+  for(let i=199;i<closes.length;i++){ const m=sma(closes,i);
+    if(st==="out" && closes[i]>m*1.05) st="in"; else if(st==="in" && closes[i]<m*0.95) st="out"; }
+  return st;
+}
+
+function compute(){
+  const ser = series(); let closes = ser.map(x=>x[1]); let lastDate = ser[ser.length-1][0];
+  let hypothetical = false;
+  // state before today's close
+  const prevState = ruleState(closes.slice(0,-1));
+  let ruleNow = ruleState(closes);
+  if(tryPrice!=null && isFinite(tryPrice) && tryPrice>0){ closes = closes.slice(0,-1).concat([tryPrice]); hypothetical=true; }
+  const i = closes.length-1, C = closes[i], m = sma(closes,i);
+  const buy=m*1.05, sell=m*0.95;
+  let my = state.myState==="auto" ? (hypothetical ? prevState : prevState) : state.myState;
+  // evaluate signal on this close given position held before it
+  let verdict, sub, color, after;
+  if(my==="out"){
+    if(C>buy){ verdict="Señal de compra."; sub=`El cierre quedó ${pa(C/buy-1)} por encima de la banda de compra. Compra mañana.`; color="var(--buy)"; after="in"; }
+    else { verdict="Sigue en dólares."; sub=`Falta que el precio suba ${pa(buy/C-1)} para cerrar sobre la banda de compra.`; color="var(--muted)"; after="out"; }
+  } else {
+    if(C<sell){ verdict="Señal de venta."; sub=`El cierre quedó ${pa(C/sell-1)} por debajo de la banda de venta. Vende todo mañana.`; color="var(--sell)"; after="out"; }
+    else { verdict="Mantén tu BTC."; sub=`El precio está ${pa(C/sell-1)} por encima de la banda de venta.`; color="var(--in)"; after="in"; }
+  }
+  // tomorrow's trigger prices
+  const s199 = closes.slice(-199).reduce((a,b)=>a+b,0);
+  const tBuy = 1.05*s199/(200-1.05), tSell = 0.95*s199/(200-0.95);
+  return {C,m,buy,sell,lastDate,hypothetical,my,after,verdict,sub,color,tBuy,tSell,closes,ser};
+}
+
+function render(){
+  const r = compute();
+  $("verdict").textContent = r.verdict; $("verdict").style.color = r.color==="var(--muted)"?"var(--ink)":r.color;
+  $("verdictSub").textContent = (r.hypothetical ? `Si hoy cerrara en ${fmt(r.C)}: ` : `Último cierre ${fmtDate(r.lastDate)}, ${fmt(r.C)}. `) + r.sub;
+  const mine = state.myState!=="auto";
+  $("stateText").textContent = (r.my==="in"?"Tienes BTC":"Estás en dólares") + (mine?" · marcado por ti":" · según la regla");
+  $("stateDot").style.background = r.my==="in"?"var(--in)":"var(--muted)";
+  $("vSell").textContent=fmt(r.sell); $("vSma").textContent=fmt(r.m); $("vBuy").textContent=fmt(r.buy);
+  const nextPos = r.after;
+  $("tomorrow").textContent = nextPos==="in"
+    ? `Con el próximo cierre, la señal de venta se activaría por debajo de ${fmt(r.tSell)}.`
+    : `Con el próximo cierre, la señal de compra se activaría por encima de ${fmt(r.tBuy)}.`;
+  drawLane(r); drawChart(r); renderCloses(r); calcSize(r); renderLog();
+  const gap = dayDiff(r.lastDate, todayUTC());
+  if(gap>1) $("addMsg").innerHTML = `<span class="err">Faltan ${gap-1} cierre${gap-1>1?"s":""} desde el ${fmtDate(addDay(r.lastDate))}. Agrégalos para que la media sea exacta.</span>`;
+  if(!$("cDate").value || $("cDate").dataset.auto==="1"){ $("cDate").value = addDay(r.lastDate); $("cDate").dataset.auto="1"; }
+  if(!$("entry").value) $("entry").value = Math.round(r.C);
+}
+function todayUTC(){ return new Date().toISOString().slice(0,10); }
+
+function drawLane(r){
+  const lo = Math.min(r.sell, r.C)*0.97, hi = Math.max(r.buy, r.C)*1.03, X = v => ((v-lo)/(hi-lo)*100);
+  const L = $("lane");
+  L.innerHTML = `
+   <div class="track">
+     <div class="zone sellz" style="left:0;width:${X(r.sell)}%"></div>
+     <div class="zone midz" style="left:${X(r.sell)}%;width:${X(r.buy)-X(r.sell)}%"></div>
+     <div class="zone buyz" style="left:${X(r.buy)}%;right:0"></div>
+   </div>
+   <div class="tick" style="left:${X(r.sell)}%;background:var(--sell)"></div>
+   <div class="tick" style="left:${X(r.m)}%;background:var(--sma)"></div>
+   <div class="tick" style="left:${X(r.buy)}%;background:var(--buy)"></div>
+   <div class="tlabel" style="left:${X(r.sell)}%"><b>Venta</b></div>
+   <div class="tlabel" style="left:${X(r.m)}%"><b>Media</b></div>
+   <div class="tlabel" style="left:${X(r.buy)}%"><b>Compra</b></div>
+   <div class="marker" style="left:${Math.min(96,Math.max(4,X(r.C)))}%"><div class="val num">${fmt(r.C)}</div><div class="stem"></div><div class="knob"></div></div>`;
+}
+
+function drawChart(r){
+  const closes = r.closes, n=closes.length, N=200, start=n-N;
+  const P=[],M=[]; for(let i=start;i<n;i++){ P.push(closes[i]); M.push(sma(closes,i)); }
+  const all = P.concat(M.map(x=>x*1.05), M.map(x=>x*0.95));
+  const lo=Math.min(...all)*0.97, hi=Math.max(...all)*1.02, W=720,H=260,pl=48,pr=8,pt=10,pb=24;
+  const x=i=>pl+i*(W-pl-pr)/(N-1), y=v=>pt+(hi-v)/(hi-lo)*(H-pt-pb);
+  const path=(arr,k=1)=>arr.map((v,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(v*k).toFixed(1)).join("");
+  let g=""; const steps=4;
+  for(let s=0;s<=steps;s++){ const v=lo+(hi-lo)*s/steps;
+    g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${y(v)+4}" text-anchor="end">${Math.round(v/1000)}k</text>`; }
+  const ser=r.ser.slice(-N);
+  [0,Math.floor(N/2),N-1].forEach(i=>{ g+=`<text x="${x(i)}" y="${H-6}" text-anchor="${i===0?'start':i===N-1?'end':'middle'}">${fmtDate(ser[i][0])}</text>`; });
+  $("chart").innerHTML = g +
+    `<path d="${path(M,1.05)}" fill="none" stroke="var(--buy)" stroke-width="1.5" stroke-dasharray="4 3"/>
+     <path d="${path(M,0.95)}" fill="none" stroke="var(--sell)" stroke-width="1.5" stroke-dasharray="4 3"/>
+     <path d="${path(M)}" fill="none" stroke="var(--sma)" stroke-width="1.5" opacity=".7"/>
+     <path d="${path(P)}" fill="none" stroke="var(--price)" stroke-width="2"/>
+     <circle cx="${x(N-1)}" cy="${y(P[N-1])}" r="4" fill="var(--price)"/>`;
+}
+
+function renderCloses(r){
+  const last = r.ser.slice(-7).reverse(), addedSet = new Set(state.added.map(a=>a[0]));
+  $("closesTbl").innerHTML = last.map(([d,v])=>`<tr><td>${fmtDate(d)}${addedSet.has(d)?'<span class="tag">agregado por ti</span>':''}</td><td>${fmt(v)}</td></tr>`).join("");
+  $("undoClose").disabled = state.added.length===0;
+}
+
+function calcSize(r){
+  const cap=parseNum($("capital").value), fee=parseFloat($("fee").value), e=parseNum($("entry").value);
+  if(!(cap>0&&e>0)){ ["oQty","oFee","oExit","oPL"].forEach(k=>$(k).textContent="—"); return; }
+  const qty=cap*(1-fee)/e, feeAmt=cap*fee, exitVal=qty*r.sell*(1-fee), pl=exitVal-cap;
+  $("oQty").textContent = qty.toLocaleString("es-CO",{maximumFractionDigits:6})+" BTC";
+  $("oFee").textContent = fmt(feeAmt,2);
+  $("oExit").textContent = fmt(exitVal);
+  $("oPL").textContent = `${pl>=0?"+":"−"}${fmt(Math.abs(pl))} (${pct(pl/cap)})`;
+  $("oPL").style.color = pl>=0?"var(--in)":"var(--sell)";
+}
+
+function addClose(d,v){
+  const ser=series(), last=ser[ser.length-1][0];
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return "Revisa la fecha.";
+  if(!(v>0)) return "Escribe un precio válido.";
+  if(d<=last) return `Ya hay un cierre para el ${fmtDate(d)} o anterior. El siguiente que falta es el ${fmtDate(addDay(last))}.`;
+  if(d!==addDay(last)) return `Falta el cierre del ${fmtDate(addDay(last))}. Agrega los días en orden, sin saltos.`;
+  if(d>=todayUTC()) return `El día ${fmtDate(d)} todavía no ha cerrado (cierra a las 00:00 UTC).`;
+  const prev=ser[ser.length-1][1]; if(Math.abs(v/prev-1)>0.35) return `Ese precio difiere más de 35% del cierre anterior (${fmt(prev)}). Revísalo.`;
+  state.added.push([d,v]); return null;
+}
+
+$("addClose").onclick=()=>{ const err=addClose($("cDate").value, parseNum($("cPrice").value));
+  if(err){ $("addMsg").innerHTML=`<span class="err">${err}</span>`; return; }
+  $("addMsg").innerHTML=`<span class="ok">Cierre agregado.</span>`; $("cPrice").value=""; $("cDate").dataset.auto="1"; $("cDate").value=""; persist(); render(); };
+$("cDate").oninput=()=>{$("cDate").dataset.auto="0"};
+$("addBulk").onclick=()=>{ const lines=$("bulk").value.split(/\n+/).map(s=>s.trim()).filter(Boolean); let ok=0;
+  for(const ln of lines){ const m=ln.match(/(\d{4}-\d{2}-\d{2})[\s,;\t]+(.+)/); if(!m){ $("addMsg").innerHTML=`<span class="err">No entendí la línea “${ln}”. Usa el formato 2026-10-11, 83877.</span>`; break; }
+    const err=addClose(m[1],parseNum(m[2])); if(err){ $("addMsg").innerHTML=`<span class="err">${ok} agregados. Se detuvo en “${ln}”: ${err}</span>`; break; } ok++; }
+  if(ok===lines.length && ok>0){ $("addMsg").innerHTML=`<span class="ok">${ok} cierres agregados.</span>`; $("bulk").value=""; }
+  if(ok){ $("cDate").dataset.auto="1"; $("cDate").value=""; persist(); render(); } };
+$("undoClose").onclick=()=>{ const x=state.added.pop(); if(x){ $("addMsg").innerHTML=`<span class="ok">Borrado el cierre del ${fmtDate(x[0])}.</span>`; $("cDate").dataset.auto="1"; $("cDate").value=""; persist(); render(); } };
+$("tryPrice").oninput=()=>{ const v=parseNum($("tryPrice").value); tryPrice = v>0?v:null; render(); };
+$("refresh").onclick=()=>refreshPrices();
+$("tryClear").onclick=()=>{ $("tryPrice").value=""; tryPrice=null; render(); };
+function setMy(v){ state.myState=v; [["stAuto","auto"],["stIn","in"],["stOut","out"]].forEach(([id,k])=>$(id).setAttribute("aria-pressed",String(k===v))); persist(); render(); }
+$("stAuto").onclick=()=>setMy("auto"); $("stIn").onclick=()=>setMy("in"); $("stOut").onclick=()=>setMy("out");
+["capital","entry"].forEach(id=>$(id).oninput=()=>{ state.capital=parseNum($("capital").value)||state.capital; persist(); calcSize(compute()); });
+$("fee").onchange=()=>{ state.fee=parseFloat($("fee").value); persist(); calcSize(compute()); };
+
+function renderLog(){
+  $("logList").innerHTML = state.log.length ? state.log.slice().reverse().map((e,i)=>{ const idx=state.log.length-1-i;
+    return `<li><span><b>${e.act}</b> · ${fmtDate(e.date)}${e.price?` · ${fmt(e.price)}`:""}${e.note?`<br><span style="color:var(--muted)">${escapeHtml(e.note)}</span>`:""}</span><button class="ghost" data-del="${idx}" aria-label="Borrar anotación">Borrar</button></li>`}).join("")
+    : `<li style="color:var(--muted)">Aún no hay anotaciones. Registra tu primera compra cuando la hagas.</li>`;
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ state.log.splice(+b.dataset.del,1); persist(); renderLog(); });
+}
+function escapeHtml(s){ return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+$("addLog").onclick=()=>{ const p=parseNum($("lPrice").value); state.log.push({date:todayUTC(),act:$("lAct").value,price:p>0?p:null,note:$("lNote").value.trim().slice(0,300)});
+  $("lPrice").value=""; $("lNote").value=""; persist(); renderLog(); };
+
+/* persistence: per-person db when available, else this browser */
+let saveTimer=null;
+function persist(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>{ const data={added:state.added,myState:state.myState,capital:state.capital,fee:state.fee,log:state.log};
+  if(store) store.save(data).catch(()=>{}); try{ localStorage.setItem("btc-sma200",JSON.stringify(data)); }catch(e){} },400); }
+function applyData(d){ if(!d) return; state = Object.assign(state, d);
+  // drop added closes already covered by embedded history
+  const last=HIST[HIST.length-1][0]; state.added=(state.added||[]).filter(a=>a[0]>last);
+  $("capital").value=state.capital; $("fee").value=String(state.fee); setMyButtons(); }
+function setMyButtons(){ [["stAuto","auto"],["stIn","in"],["stOut","out"]].forEach(([id,k])=>$(id).setAttribute("aria-pressed",String(k===state.myState))); }
+
+try{ const raw=localStorage.getItem("btc-sma200"); if(raw) applyData(JSON.parse(raw)); }catch(e){}
+render();
+
+
+/* precios automáticos: Kraken, y Coinbase como respaldo */
+async function fromKraken(){
+  const r=await fetch("https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440"); const j=await r.json();
+  if(j.error&&j.error.length) throw new Error(j.error.join());
+  const rows=Object.values(j.result).find(Array.isArray);
+  return rows.map(x=>[new Date(x[0]*1000).toISOString().slice(0,10), parseFloat(x[4])]);
+}
+async function fromCoinbase(){
+  const out=[]; let end=new Date();
+  for(let k=0;k<3;k++){ const start=new Date(end.getTime()-299*864e5);
+    const r=await fetch(`https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400&start=${start.toISOString()}&end=${end.toISOString()}`);
+    const rows=await r.json(); if(!Array.isArray(rows)) throw new Error("coinbase");
+    rows.forEach(x=>out.push([new Date(x[0]*1000).toISOString().slice(0,10), x[4]])); end=new Date(start.getTime()-864e5); }
+  return out;
+}
+function cleanSeries(rows){
+  const m=new Map(); rows.forEach(([d,v])=>{ if(v>0) m.set(d,v); });
+  const t=todayUTC(); const arr=[...m.entries()].filter(([d])=>d<t).sort((a,b)=>a[0]<b[0]?-1:1);
+  // keep only the latest run of consecutive days
+  let i=arr.length-1; while(i>0 && dayDiff(arr[i-1][0],arr[i][0])===1) i--;
+  return arr.slice(i);
+}
+async function refreshPrices(){
+  const note=$("srcNote"); note.textContent="Buscando los últimos cierres…";
+  for(const [name,fn] of [["Kraken",fromKraken],["Coinbase",fromCoinbase]]){
+    try{ const ser=cleanSeries(await fn());
+      if(ser.length<260) continue;
+      const lastLocal=series()[series().length-1][0];
+      HIST=ser; state.added=state.added.filter(a=>a[0]>HIST[HIST.length-1][0]);
+      persist(); $("cDate").dataset.auto="1"; $("cDate").value=""; render();
+      note.innerHTML=`<span class="ok">Cierres actualizados automáticamente desde ${name} hasta el ${fmtDate(HIST[HIST.length-1][0])}.</span>`;
+      return;
+    }catch(e){}
+  }
+  note.innerHTML=`<span class="err">No se pudieron descargar los precios (sin conexión o la fuente bloqueó el acceso). Puedes agregar los cierres a mano.</span>`;
+}
+refreshPrices();
+
+</script>
+</body>
+</html>
